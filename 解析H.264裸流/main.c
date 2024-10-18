@@ -83,21 +83,29 @@ int GetAnnexbNALU (NALU_t *nalu){
 	int StartCodeFound, rewind;
 	unsigned char *Buf;
  
+    // 重新申请了一块内存，大小为nalu->max_size
 	if ((Buf = (unsigned char*)calloc (nalu->max_size , sizeof(char))) == NULL) 
 		printf ("GetAnnexbNALU: Could not allocate Buf memory\n");
  
 	nalu->startcodeprefix_len=3;
  
+    // 读取3个字节的数据到Buf中
 	if (3 != fread (Buf, 1, 3, h264bitstream)){
 		free(Buf);
 		return 0;
 	}
+
+    // 查找起始码0x000001
 	info2 = FindStartCode2 (Buf);
-	if(info2 != 1) {
+	if(info2 != 1) { // 未找到0x000001的起始码
+
+        // 可能是0x00000001的起始码，表示一帧数据的第一个slice，其他的slice都是0x000001的起始码
 		if(1 != fread(Buf+3, 1, 1, h264bitstream)){
 			free(Buf);
 			return 0;
 		}
+
+        // 查找起始码0x00000001
 		info3 = FindStartCode3 (Buf);
 		if (info3 != 1){ 
 			free(Buf);
@@ -116,6 +124,7 @@ int GetAnnexbNALU (NALU_t *nalu){
 	info2 = 0;
 	info3 = 0;
  
+    // while循环中的代码目的是找到下一个起始码，并计算出NALU的长度
 	while (!StartCodeFound){
 		if (feof (h264bitstream)){
 			nalu->len = (pos-1)-nalu->startcodeprefix_len;
@@ -126,6 +135,8 @@ int GetAnnexbNALU (NALU_t *nalu){
 			free(Buf);
 			return pos-1;
 		}
+
+        // 读取一个字节的数据到Buf中， 文件指针向后移动一个字节
 		Buf[pos++] = fgetc (h264bitstream);
 		info3 = FindStartCode3(&Buf[pos-4]);
 		if(info3 != 1)
@@ -137,6 +148,7 @@ int GetAnnexbNALU (NALU_t *nalu){
 	// have.  Hence, go back in the file
 	rewind = (info3 == 1)? -4 : -3;
  
+    // 由于fgetc移动了文件指针，所以需要将文件指针回退到正确的位置，此时文件指针指向的是下一个NALU的起始码的位置
 	if (0 != fseek (h264bitstream, rewind, SEEK_CUR)){
 		free(Buf);
 		printf("GetAnnexbNALU: Cannot fseek in the bit stream file");
@@ -145,14 +157,28 @@ int GetAnnexbNALU (NALU_t *nalu){
 	// Here the Start code, the complete NALU, and the next start code is in the Buf.  
 	// The size of Buf is pos, pos+rewind are the number of bytes excluding the next
 	// start code, and (pos+rewind)-startcodeprefix_len is the size of the NALU excluding the start code
- 
+    
+    // 获取NALU的长度，即从起始码开始到下一个起始码之间的字节数
 	nalu->len = (pos+rewind)-nalu->startcodeprefix_len;
+
+    // 拷贝一个个NALU的数据到nalu->buf中
 	memcpy (nalu->buf, &Buf[nalu->startcodeprefix_len], nalu->len);//
+
+    // slice数据的第一个字节数据，分析slice类型 idr帧， sps帧，pps帧以及其他帧（普通I帧，B帧， P帧）
 	nalu->forbidden_bit = nalu->buf[0] & 0x80; //1 bit
 	nalu->nal_reference_idc = nalu->buf[0] & 0x60; // 2 bit
 	nalu->nal_unit_type = (nalu->buf[0]) & 0x1f;// 5 bit
 	free(Buf);
  
+
+    // 返回下一个起始码的位置
+    /**
+     *    00 00 00 01 xx xx xx xx xx xx xx xx 00 00 01
+     *    上述一行数据为一个NALU，其中00 00 00 01为一帧数据的第一个slice的起始码，
+     *    xx xx xx xx xx xx xx xx 为NALU数据，
+     *    00 00 01为下一个起始码
+     *    pos+rewind表示下一个起始码的位置，即00 00 01的位置的偏移量
+     **/
 	return (pos+rewind);
 }
  
@@ -200,6 +226,8 @@ int simplest_h264_parser(char *url){
 		data_lenth=GetAnnexbNALU(n);
  
 		char type_str[20]={0};
+
+        // 根据NALU的类型，输出相应的类型字符串
 		switch(n->nal_unit_type){
 			case NALU_TYPE_SLICE:sprintf(type_str,"SLICE");break;
 			case NALU_TYPE_DPA:sprintf(type_str,"DPA");break;
@@ -215,6 +243,7 @@ int simplest_h264_parser(char *url){
 			case NALU_TYPE_FILL:sprintf(type_str,"FILL");break;
 		}
 		char idc_str[20]={0};
+        // 将n->nal_reference_idc右移5位，因为高3位表示参考级别，最高位为0,表示为
 		switch(n->nal_reference_idc>>5){
 			case NALU_PRIORITY_DISPOSABLE:sprintf(idc_str,"DISPOS");break;
 			case NALU_PRIRITY_LOW:sprintf(idc_str,"LOW");break;
