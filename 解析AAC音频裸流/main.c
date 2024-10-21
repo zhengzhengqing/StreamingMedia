@@ -44,8 +44,10 @@ int getADTSframe(unsigned char* buffer, int buf_size, unsigned char* data ,int* 
 			return -1;
 		}
 		//Sync words， 同步字， 固定为0xFFF,占用12位，另外一个字节的高四位为1111
+		// ADTS Header 数据类似于：FF F9 50 80 2E 7F FC
 		if((buffer[0] == 0xff) && ((buffer[1] & 0xf0) == 0xf0) ){
 			
+			// 解析ADTS frame的大小(包括 ADTS Header 和 AAC Data)
 			size |= ((buffer[3] & 0x03) <<11);     //high 2 bit
 			size |= buffer[4]<<3;                //middle 8 bit
 			size |= ((buffer[5] & 0xe0)>>5);        //low 3bit
@@ -55,6 +57,8 @@ int getADTSframe(unsigned char* buffer, int buf_size, unsigned char* data ,int* 
 		++buffer;
 	}
  
+	// buf_size 为当前读取的文件大小， size 为 ADTS frame 的大小
+	// 如果当前读取的文件大小小于 ADTS frame 的大小，则说明 ADTS frame 不完整，需要继续读取
 	if(buf_size < size){
 		return 1;
 	}
@@ -94,6 +98,10 @@ int simplest_aac_parser(char *url)
  
 		while(1)
 		{
+			// 该函数对ADTS frame进行解析，并返回ADTS frame的大小
+			// 如果返回-1，则说明ADTS frame不完整，需要继续读取
+			// 如果返回1，则说明ADTS frame完整，可以进行处理
+			// 如果返回0，则说明ADTS frame已经处理完毕，aacframe保存了ADTS frame的数据，size保存了ADTS frame的大小
 			int ret=getADTSframe(input_data, data_size, aacframe, &size);
 			if(ret==-1){
 				break;
@@ -106,6 +114,8 @@ int simplest_aac_parser(char *url)
 			char profile_str[10]={0};
 			char frequence_str[10]={0};
  
+			// ADTS frame的profile字段 保存在 aacframe[2]的高两位
+			// 和0xC0进行与运算(1100 0000)，然后右移6位，得到profile的值
 			unsigned char profile=aacframe[2]&0xC0;
 			profile=profile>>6;
 			switch(profile){
@@ -114,7 +124,9 @@ int simplest_aac_parser(char *url)
 			case 2: sprintf(profile_str,"SSR");break;
 			default:sprintf(profile_str,"unknown");break;
 			}
- 
+
+			// ADTS frame的采样率字段 保存在 aacframe[2]的中间四位
+			// 和0x3C进行与运算(0011 1100)，然后右移2位，得到采样率的值
 			unsigned char sampling_frequency_index=aacframe[2]&0x3C;
 			sampling_frequency_index=sampling_frequency_index>>2;
 			switch(sampling_frequency_index){
