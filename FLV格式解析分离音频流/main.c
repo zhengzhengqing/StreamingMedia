@@ -39,14 +39,16 @@
  
 typedef unsigned char byte;
 typedef unsigned int uint;
- 
+
+// FLV Header 大小为9个字节
 typedef struct {
 	byte Signature[3];
 	byte Version;
 	byte Flags;
 	uint DataOffset;
 } FLV_HEADER;
- 
+
+// FLV Tag Header 大小为11个字节
 typedef struct {
 	byte TagType;
 	byte DataSize[3];
@@ -80,8 +82,12 @@ int simplest_flv_parser(char *url){
 	//FILE *myout=fopen("output_log.txt","wb+");
 	FILE *myout=stdout;
  
+	// 定义FLV文件头
 	FLV_HEADER flv;
+
+	// 定义FLV Tag头
 	TAG_HEADER tagheader;
+
 	uint previoustagsize, previoustagsize_z=0;
 	uint ts=0, ts_new=0;
  
@@ -91,31 +97,41 @@ int simplest_flv_parser(char *url){
 		return -1;
 	}
  
-	//FLV file header
+	//FLV file header, 读取9个字节, 读取成功后，会向后移动文件指针9个字节
 	fread((char *)&flv,1,sizeof(FLV_HEADER),ifh);
- 
+	
 	fprintf(myout,"============== FLV Header ==============\n");
 	fprintf(myout,"Signature:  0x %c %c %c\n",flv.Signature[0],flv.Signature[1],flv.Signature[2]);
 	fprintf(myout,"Version:    0x %X\n",flv.Version);
 	fprintf(myout,"Flags  :    0x %X\n",flv.Flags);
 	fprintf(myout,"HeaderSize: 0x %X\n",reverse_bytes((byte *)&flv.DataOffset, sizeof(flv.DataOffset)));
 	fprintf(myout,"========================================\n");
- 
+	// printf("size = %d\n", sizeof(FLV_HEADER));
+	// printf("size = %d\n", sizeof(flv.DataOffset));
 	//move the file pointer to the end of the header
 	fseek(ifh, reverse_bytes((byte *)&flv.DataOffset, sizeof(flv.DataOffset)), SEEK_SET);
  
 	//process each tag
 	do {
- 
+		
+		// 读取四个字节，读取成功后，会向后移动文件指针4个字节
 		previoustagsize = getw(ifh);
- 
+		//printf("previoustagsize = %d\n", previoustagsize);
+		
+		// 读取11个字节，读取成功后，文件指针会向后移动文件指针11个字节
 		fread((void *)&tagheader,sizeof(TAG_HEADER),1,ifh);
  
 		//int temp_datasize1=reverse_bytes((byte *)&tagheader.DataSize, sizeof(tagheader.DataSize));
+
+		// tag data 的大小
 		int tagheader_datasize=tagheader.DataSize[0]*65536+tagheader.DataSize[1]*256+tagheader.DataSize[2];
+
+		// tag的时间戳
 		int tagheader_timestamp=tagheader.Timestamp[0]*65536+tagheader.Timestamp[1]*256+tagheader.Timestamp[2];
  
 		char tagtype_str[10];
+
+		// 分析tag的类型， 0x08是音频，0x09是视频，0x12是脚本
 		switch(tagheader.TagType){
 		case TAG_TYPE_AUDIO:sprintf(tagtype_str,"AUDIO");break;
 		case TAG_TYPE_VIDEO:sprintf(tagtype_str,"VIDEO");break;
@@ -132,13 +148,20 @@ int simplest_flv_parser(char *url){
 		//process tag by type
 		switch (tagheader.TagType) {
  
+	    // 音频tag
 		case TAG_TYPE_AUDIO:{ 
 			char audiotag_str[100]={0};
 			strcat(audiotag_str,"| ");
 			char tagdata_first_byte;
+
+			// 音频tag data的第一个字节，高4位是音频格式，第0位为类型（0：单声道，1：双声道， 第1位为精度
+			// 第 2, 3 位为采样率（0：5.5khz，1：11khz，2：22khz，3：44khz）
 			tagdata_first_byte=fgetc(ifh);
+
+			// 和0xF0做与运算，得到高4位
 			int x=tagdata_first_byte&0xF0;
-			x=x>>4;
+			// 右移4位
+			x=x>>4; 
 			switch (x)
 			{
 			case 0:strcat(audiotag_str,"Linear PCM, platform endian");break;
@@ -158,6 +181,8 @@ int simplest_flv_parser(char *url){
 			default:strcat(audiotag_str,"UNKNOWN");break;
 			}
 			strcat(audiotag_str,"| ");
+
+			// 和0x0C做与运算，获取采样率
 			x=tagdata_first_byte&0x0C;
 			x=x>>2;
 			switch (x)
@@ -169,6 +194,7 @@ int simplest_flv_parser(char *url){
 			default:strcat(audiotag_str,"UNKNOWN");break;
 			}
 			strcat(audiotag_str,"| ");
+			// 和0x30做与运算，获取采样精度（8bit, 16bit）
 			x=tagdata_first_byte&0x02;
 			x=x>>1;
 			switch (x)
@@ -178,6 +204,7 @@ int simplest_flv_parser(char *url){
 			default:strcat(audiotag_str,"UNKNOWN");break;
 			}
 			strcat(audiotag_str,"| ");
+			// 和0x40做与运算，获取音频类型（单声道，立体声）
 			x=tagdata_first_byte&0x01;
 			switch (x)
 			{
@@ -193,9 +220,10 @@ int simplest_flv_parser(char *url){
 			}
  
 			//TagData - First Byte Data
+			// tagheader.DataSize 是Tag data 的大小，减去1是因为第一个字节是音频类型
 			int data_size=reverse_bytes((byte *)&tagheader.DataSize, sizeof(tagheader.DataSize))-1;
 			if(output_a!=0){
-				//TagData+1
+				//TagData+1, 将音频数据写入文件
 				for (int i=0; i<data_size; i++)
 					fputc(fgetc(ifh),afh);
  
@@ -205,6 +233,7 @@ int simplest_flv_parser(char *url){
 			}
 			break;
 		}
+		// 视频tag
 		case TAG_TYPE_VIDEO:{
 			char videotag_str[100]={0};
 			strcat(videotag_str,"| ");
@@ -212,6 +241,8 @@ int simplest_flv_parser(char *url){
 			tagdata_first_byte=fgetc(ifh);
 			int x=tagdata_first_byte&0xF0;
 			x=x>>4;
+
+			// 帧类型
 			switch (x)
 			{
 			case 1:strcat(videotag_str,"key frame  ");break;
@@ -223,6 +254,8 @@ int simplest_flv_parser(char *url){
 			}
 			strcat(videotag_str,"| ");
 			x=tagdata_first_byte&0x0F;
+
+			// 视频编码类型
 			switch (x)
 			{
 			case 1:strcat(videotag_str,"JPEG (currently unused)");break;
@@ -236,12 +269,18 @@ int simplest_flv_parser(char *url){
 			}
 			fprintf(myout,"%s",videotag_str);
  
+			// 目前的文件指针只想video tag 的第二个字节，第一个字节是描述视频参数的
+			// 在封装flv的时候，视频参数需要封装进去，所以文件指针需要回退一个字节
 			fseek(ifh, -1, SEEK_CUR);
 			//if the output file hasn't been opened, open it.
 			if (vfh == NULL&&output_v!=0) {
 				//write the flv header (reuse the original file's hdr) and first previoustagsize
 					vfh = fopen("output.flv", "wb");
+
+					// 写入FLV头
 					fwrite((char *)&flv,1, sizeof(flv),vfh);
+
+					// 写入第一个previoustagsize，第一个是0
 					fwrite((char *)&previoustagsize_z,1,sizeof(previoustagsize_z),vfh);
 			}
 #if 0
@@ -253,7 +292,6 @@ int simplest_flv_parser(char *url){
 			ts_new = reverse_bytes((byte *)&ts, sizeof(ts));
 			memcpy(&tagheader.Timestamp, ((char *)&ts_new) + 1, sizeof(tagheader.Timestamp));
 #endif
- 
  
 			//TagData + Previous Tag Size
 			int data_size=reverse_bytes((byte *)&tagheader.DataSize, sizeof(tagheader.DataSize))+4;
