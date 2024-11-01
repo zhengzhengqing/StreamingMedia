@@ -147,23 +147,34 @@ int main(int argc, char *argv[]) {
                 
                 // 写入YUV420P格式的帧数据
                 fwrite(frame_yuv->data[0], 1, pCodecCtx->width * pCodecCtx->height, pFile);
-                fwrite(frame_yuv->data[1], 1, pCodecCtx->width * pCodecCtx->height / 4, pFile);
+                fwrite(frame_yuv->data[1], 1, pCodecCtx->width * pCodecCtx->height / 4 , pFile);
                 fwrite(frame_yuv->data[2], 1, pCodecCtx->width * pCodecCtx->height / 4, pFile);
+
+                // fwrite(frame_yuv->data[0], 1, frame_yuv->linesize[0] * pCodecCtx->height, pFile);
+                // fwrite(frame_yuv->data[1], 1, frame_yuv->linesize[1] * pCodecCtx->height / 2 , pFile);
+                // fwrite(frame_yuv->data[2], 1, frame_yuv->linesize[2] * pCodecCtx->height / 2, pFile);
+                
+                
             }
         }
         av_packet_unref(&packet); // 释放packet 所指向的缓冲区,并不是释放packet本身
     }
 
     // 释放资源
+    // av_frame_free(&frame) 只释放 AVFrame 结构体本身，而不释放 frame->data 指向的缓冲区。
+    // 你需要根据缓冲区的来源和分配方式来确定如何正确地释放它们。
     av_frame_free(&frame);
     av_frame_free(&frame_yuv);
+
+    av_free(out_buffer);
+    
 
     sws_freeContext(sws_ctx);
     avcodec_close(pCodecCtx);
     avformat_close_input(&pFormatCtx);
 
     fclose(pFile);
-    av_free(out_buffer);
+    
     
     return 1;
 }
