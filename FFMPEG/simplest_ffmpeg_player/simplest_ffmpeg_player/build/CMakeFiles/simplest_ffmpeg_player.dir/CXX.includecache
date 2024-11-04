@@ -1,0 +1,32 @@
+#IncludeRegexLine: ^[ 	]*[#%][ 	]*(include|import)[ 	]*[<"]([^">]+)([">])
+
+#IncludeRegexScan: ^.*$
+
+#IncludeRegexComplain: ^$
+
+#IncludeRegexTransform: 
+
+/home/zzq/StreamingMedia/FFMPEG/simplest_ffmpeg_player/simplest_ffmpeg_player/src/simplest_ffmpeg_player.cpp
+stdio.h
+-
+libavcodec/avcodec.h
+/home/zzq/StreamingMedia/FFMPEG/simplest_ffmpeg_player/simplest_ffmpeg_player/src/libavcodec/avcodec.h
+libavformat/avformat.h
+/home/zzq/StreamingMedia/FFMPEG/simplest_ffmpeg_player/simplest_ffmpeg_player/src/libavformat/avformat.h
+libswscale/swscale.h
+/home/zzq/StreamingMedia/FFMPEG/simplest_ffmpeg_player/simplest_ffmpeg_player/src/libswscale/swscale.h
+libavutil/imgutils.h
+/home/zzq/StreamingMedia/FFMPEG/simplest_ffmpeg_player/simplest_ffmpeg_player/src/libavutil/imgutils.h
+SDL2/SDL.h
+/home/zzq/StreamingMedia/FFMPEG/simplest_ffmpeg_player/simplest_ffmpeg_player/src/SDL2/SDL.h
+libavcodec/avcodec.h
+-
+libavformat/avformat.h
+-
+libswscale/swscale.h
+-
+SDL2/SDL.h
+-
+libavutil/imgutils.h
+-
+

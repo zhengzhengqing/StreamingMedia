@@ -1,0 +1,1 @@
+/usr/bin/c++     CMakeFiles/simplest_ffmpeg_player.dir/src/simplest_ffmpeg_player.cpp.o  -o simplest_ffmpeg_player  -lavcodec -lavdevice -lavutil -lavfilter -lpostproc -lSDL2 -lswresample -lswscale -lavformat -lSDL2main 
