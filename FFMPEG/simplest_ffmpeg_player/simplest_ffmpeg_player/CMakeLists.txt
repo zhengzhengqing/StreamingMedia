@@ -21,7 +21,7 @@ add_executable(simplest_ffmpeg_player
 
 # # 添加一个可执行文件，并链接之前定义的库  
 add_executable(ffmpeg_player
-    src/ffmpeg_decoder_pure.cpp
+    src/ffmpeg_player.cpp
 )
 
 target_link_libraries(simplest_ffmpeg_player 

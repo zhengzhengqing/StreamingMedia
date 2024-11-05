@@ -174,12 +174,14 @@ int main(int argc, char* argv[])
 					return -1;
 				}
 
+				// 转换为YUV420P
+				sws_scale(img_convert_ctx, (uint8_t const * const *)pFrame->data, pFrame->linesize, 0, pCodecCtx->height, pFrameYUV->data, pFrameYUV->linesize);
+
 				// 更新纹理
 				SDL_UpdateYUVTexture(sdlTexture, &sdlRect,
 				pFrameYUV->data[0], pFrameYUV->linesize[0],
 				pFrameYUV->data[1], pFrameYUV->linesize[1],
-				pFrameYUV->data[2], pFrameYUV->linesize[2]);
-#endif	
+				pFrameYUV->data[2], pFrameYUV->linesize[2]);	
 				
 				SDL_RenderClear( sdlRenderer );  
 				SDL_RenderCopy( sdlRenderer, sdlTexture,  NULL, &sdlRect);  
@@ -189,60 +191,26 @@ int main(int argc, char* argv[])
 				SDL_Delay(40);
 			}
 		}
-
-
-		if(packet->stream_index==videoindex){
-			// 解码一帧视频数据，保存在pFrame中
-			ret = avcodec_decode_video2(pCodecCtx, pFrame, &got_picture, packet);
-			if(ret < 0){
-				printf("Decode Error.\n");
-				return -1;
-			}
-			if(got_picture){
-				// 转换图像格式，保存在pFrameYUV中
-				sws_scale(img_convert_ctx, (const unsigned char* const*)pFrame->data, pFrame->linesize, 0, pCodecCtx->height, 
-					pFrameYUV->data, pFrameYUV->linesize);
-				
-#if OUTPUT_YUV420P
-				y_size=pCodecCtx->width*pCodecCtx->height;  
-				fwrite(pFrameYUV->data[0],1,y_size,fp_yuv);    //Y 
-				fwrite(pFrameYUV->data[1],1,y_size/4,fp_yuv);  //U
-				fwrite(pFrameYUV->data[2],1,y_size/4,fp_yuv);  //V
-#endif
-				//SDL---------------------------
-#if 0
-				SDL_UpdateTexture( sdlTexture, NULL, pFrameYUV->data[0], pFrameYUV->linesize[0] );  
-#else
-				// 更新纹理
-				SDL_UpdateYUVTexture(sdlTexture, &sdlRect,
-				pFrameYUV->data[0], pFrameYUV->linesize[0],
-				pFrameYUV->data[1], pFrameYUV->linesize[1],
-				pFrameYUV->data[2], pFrameYUV->linesize[2]);
-#endif	
-				
-				SDL_RenderClear( sdlRenderer );  
-				SDL_RenderCopy( sdlRenderer, sdlTexture,  NULL, &sdlRect);  
-				SDL_RenderPresent( sdlRenderer );  
-				//SDL End-----------------------
-				//Delay 40ms
-				SDL_Delay(40);
-			}
-		}
-		av_free_packet(packet);
+		// av_free_packet 专注于释放 data 字段的内存，但不会重置 AVPacket 的其他字段。
+		// av_packet_unref 不仅释放 data 字段的内存，还会重置 AVPacket 的所有字段到它们的默认值，是一种更全面的清理方式。
+		//av_free_packet(packet);
+		av_packet_unref(packet);
+		av_frame_unref(pFrame);
 	}
+
 
 	sws_freeContext(img_convert_ctx);
 
-#if OUTPUT_YUV420P 
-    fclose(fp_yuv);
-#endif 
-
 	SDL_Quit();
-
+	av_free(packet);
+	
 	av_frame_free(&pFrameYUV);
 	av_frame_free(&pFrame);
+
+	av_free(out_buffer);
 	avcodec_close(pCodecCtx);
 	avformat_close_input(&pFormatCtx);
+
 
 	return 0;
 }
